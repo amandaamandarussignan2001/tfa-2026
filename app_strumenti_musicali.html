@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laboratorio Strumenti Musicali</title>
+  <!-- Tailwind CSS per layout responsive e moderno -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome per le icone dell'interfaccia -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #f1f5f9;
+      user-select: none;
+    }
+
+    .card-instrument {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: grab;
+      touch-action: manipulation;
+    }
+    .card-instrument:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.12);
+    }
+    .card-instrument:active {
+      cursor: grabbing;
+      transform: scale(0.96);
+    }
+    .card-instrument.selected-card {
+      outline: 4px solid #6366f1;
+      outline-offset: 3px;
+      border-color: #6366f1;
+      background-color: #e0e7ff;
+    }
+    
+    .drop-zone {
+      transition: all 0.2s ease;
+    }
+    .drop-zone.drag-over {
+      background-color: rgba(99, 102, 241, 0.12);
+      border-color: #4f46e5;
+      transform: scale(1.01);
+    }
+
+    .correct-card {
+      border-color: #10b981 !important;
+      background-color: #ecfdf5 !important;
+    }
+    .wrong-card {
+      border-color: #ef4444 !important;
+      background-color: #fef2f2 !important;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-white/20 p-2.5 rounded-2xl backdrop-blur-md flex items-center justify-center">
+          <i class="fa-solid fa-music text-2xl text-yellow-300"></i>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black tracking-tight">Impara gli Strumenti Musicali</h1>
+          <p class="text-xs text-indigo-200">Ascolta, scopri ed inserisci ciascun strumento nella sua famiglia</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="resetGame()" class="px-3.5 py-2 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs sm:text-sm transition-all flex items-center gap-2">
+          <i class="fa-solid fa-rotate-right"></i> Ricomincia
+        </button>
+        <button onclick="checkAnswers()" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+          <i class="fa-solid fa-circle-check text-lg"></i> Verifica Risposte
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenuto Principale -->
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
+
+    <!-- Indicatore Selezione -->
+    <div id="selection-hint" class="bg-indigo-50 border border-indigo-200 p-3 rounded-2xl flex items-center justify-between text-indigo-900 text-xs sm:text-sm font-semibold">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-indigo-600 text-base"></i>
+        <span>Suggerimento: Clicca sul tasto 🔊 per sentire il suono, poi trascina la scheda o cliccala prima di scegliere la famiglia!</span>
+      </div>
+      <span id="placed-count" class="bg-indigo-200 text-indigo-900 px-3 py-1 rounded-full font-bold">0 / 11 inseriti</span>
+    </div>
+
+    <!-- AREA POOL STRUMENTI -->
+    <section class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-layer-group text-indigo-500"></i> Strumenti da classificare:
+        </h2>
+      </div>
+
+      <div id="instruments-pool" class="flex flex-wrap gap-4 min-h-[160px] p-4 bg-slate-50/70 rounded-2xl border-2 border-dashed border-slate-300 justify-center items-center">
+        <!-- Generato dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- CATEGORIE (DROP ZONES) -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- ARCHI -->
+      <div class="drop-zone bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col cursor-pointer" data-category="archi" onclick="handleZoneClick('archi')">
+        <div class="flex items-center gap-3 pb-3 mb-3 border-b border-slate-100 pointer-events-none">
+          <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl font-bold">
+            <i class="fa-solid fa-guitar"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Archi</h3>
+            <p class="text-xs text-slate-400 font-medium">Corde sfregate o pizzicate</p>
+          </div>
+        </div>
+        <div id="zone-archi" class="category-list flex flex-wrap gap-2.5 flex-grow min-h-[220px] p-2 bg-amber-50/30 rounded-2xl border border-amber-100 align-content-start"></div>
+      </div>
+
+      <!-- FIATI -->
+      <div class="drop-zone bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col cursor-pointer" data-category="fiati" onclick="handleZoneClick('fiati')">
+        <div class="flex items-center gap-3 pb-3 mb-3 border-b border-slate-100 pointer-events-none">
+          <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center text-2xl font-bold">
+            <i class="fa-solid fa-wind"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Fiati</h3>
+            <p class="text-xs text-slate-400 font-medium">Legni e Ottoni (ad aria)</p>
+          </div>
+        </div>
+        <div id="zone-fiati" class="category-list flex flex-wrap gap-2.5 flex-grow min-h-[220px] p-2 bg-sky-50/30 rounded-2xl border border-sky-100 align-content-start"></div>
+      </div>
+
+      <!-- PERCUSSIONI -->
+      <div class="drop-zone bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col cursor-pointer" data-category="percussioni" onclick="handleZoneClick('percussioni')">
+        <div class="flex items-center gap-3 pb-3 mb-3 border-b border-slate-100 pointer-events-none">
+          <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-2xl font-bold">
+            <i class="fa-solid fa-drum"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Percussioni</h3>
+            <p class="text-xs text-slate-400 font-medium">Suonati per percussione</p>
+          </div>
+        </div>
+        <div id="zone-percussioni" class="category-list flex flex-wrap gap-2.5 flex-grow min-h-[220px] p-2 bg-rose-50/30 rounded-2xl border border-rose-100 align-content-start"></div>
+      </div>
+
+      <!-- TASTIERE -->
+      <div class="drop-zone bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col cursor-pointer" data-category="tastiere" onclick="handleZoneClick('tastiere')">
+        <div class="flex items-center gap-3 pb-3 mb-3 border-b border-slate-100 pointer-events-none">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl font-bold">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Tastiere</h3>
+            <p class="text-xs text-slate-400 font-medium">Tasti, mantici e tastiere</p>
+          </div>
+        </div>
+        <div id="zone-tastiere" class="category-list flex flex-wrap gap-2.5 flex-grow min-h-[220px] p-2 bg-indigo-50/30 rounded-2xl border border-indigo-100 align-content-start"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODALE RISULTATI -->
+  <div id="result-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center transform transition-all">
+      <div id="modal-badge" class="w-20 h-20 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-4xl mb-4">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h3 id="modal-title" class="text-2xl font-black text-slate-800 mb-2">Risultato</h3>
+      <p id="modal-message" class="text-slate-600 text-sm mb-6">Hai completato l'esercizio!</p>
+      
+      <div class="bg-slate-100 rounded-2xl p-4 mb-6">
+        <span class="text-xs text-slate-500 uppercase font-extrabold tracking-wider">Punteggio Totale</span>
+        <div id="modal-score" class="text-4xl font-black text-indigo-600 mt-1">0 / 11</div>
+      </div>
+
+      <div class="flex gap-3">
+        <button onclick="closeModal()" class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-all text-sm">
+          Rivedi errore
+        </button>
+        <button onclick="closeModal(); resetGame();" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all text-sm shadow-md">
+          Gioca Ancora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP LOGIC & AUDIO SYNTH -->
+  <script>
+    // DATI DEGLI STRUMENTI CON GRAFICA SVG DETTAGLIATA
+    const instrumentsData = [
+      {
+        id: 'violino',
+        name: 'Violino',
+        category: 'archi',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><path d="M45,15 C45,10 55,10 55,15 L55,40 C65,42 72,50 72,62 C72,70 65,75 60,75 C68,82 62,92 50,92 C38,92 32,82 40,75 C35,75 28,70 28,62 C28,50 35,42 45,40 Z" fill="#d97706" stroke="#78350f" stroke-width="2"/><circle cx="50" cy="65" r="4" fill="#451a03"/><line x1="47" y1="15" x2="47" y2="78" stroke="#fef3c7" stroke-width="1.5"/><line x1="53" y1="15" x2="53" y2="78" stroke="#fef3c7" stroke-width="1.5"/><path d="M25,30 L75,80" stroke="#92400e" stroke-width="2" stroke-dasharray="2,2"/></svg>`
+      },
+      {
+        id: 'chitarra',
+        name: 'Chitarra',
+        category: 'archi',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><path d="M45,10 L55,10 L55,45 C65,48 70,55 70,64 C70,72 63,75 62,78 C68,83 62,92 50,92 C38,92 32,83 38,78 C37,75 30,72 30,64 C30,55 35,48 45,45 Z" fill="#b45309" stroke="#451a03" stroke-width="2"/><circle cx="50" cy="62" r="7" fill="#292524" stroke="#d97706" stroke-width="1.5"/><line x1="48" y1="10" x2="48" y2="82" stroke="#e7e5e4" stroke-width="1"/><line x1="52" y1="10" x2="52" y2="82" stroke="#e7e5e4" stroke-width="1"/></svg>`
+      },
+      {
+        id: 'violoncello',
+        name: 'Violoncello',
+        category: 'archi',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><path d="M44,10 L56,10 L56,38 C68,42 75,52 75,66 C75,75 66,80 63,84 C70,90 63,98 50,98 C37,98 30,90 37,84 C34,80 25,75 25,66 C25,52 32,42 44,38 Z" fill="#78350f" stroke="#451a03" stroke-width="2"/><line x1="50" y1="98" x2="50" y2="104" stroke="#292524" stroke-width="3"/><circle cx="50" cy="66" r="5" fill="#1c1917"/><line x1="47" y1="10" x2="47" y2="88" stroke="#fef3c7" stroke-width="1.5"/><line x1="53" y1="10" x2="53" y2="88" stroke="#fef3c7" stroke-width="1.5"/></svg>`
+      },
+      {
+        id: 'flauto',
+        name: 'Flauto',
+        category: 'fiati',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="10" y="44" width="80" height="12" rx="4" fill="#94a3b8" stroke="#475569" stroke-width="2"/><circle cx="25" cy="50" r="2.5" fill="#1e293b"/><circle cx="38" cy="50" r="2.5" fill="#1e293b"/><circle cx="48" cy="50" r="2.5" fill="#1e293b"/><circle cx="58" cy="50" r="2.5" fill="#1e293b"/><circle cx="68" cy="50" r="2.5" fill="#1e293b"/><circle cx="78" cy="50" r="2.5" fill="#1e293b"/></svg>`
+      },
+      {
+        id: 'tromba',
+        name: 'Tromba',
+        category: 'fiati',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><path d="M15,45 L50,45 L50,40 L70,30 L70,70 L50,60 L50,55 L15,55 Z" fill="#eab308" stroke="#a16207" stroke-width="2"/><rect x="30" y="35" width="4" height="10" fill="#ca8a04"/><rect x="38" y="35" width="4" height="10" fill="#ca8a04"/><rect x="46" y="35" width="4" height="10" fill="#ca8a04"/><path d="M70,30 C85,30 85,70 70,70 Z" fill="#facc15" stroke="#a16207" stroke-width="2"/></svg>`
+      },
+      {
+        id: 'clarinetto',
+        name: 'Clarinetto',
+        category: 'fiati',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="44" y="10" width="12" height="65" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="2"/><path d="M44,75 L35,92 L65,92 L56,75 Z" fill="#0f172a" stroke="#000" stroke-width="1.5"/><circle cx="50" cy="25" r="2" fill="#e2e8f0"/><circle cx="50" cy="35" r="2" fill="#e2e8f0"/><circle cx="50" cy="45" r="2" fill="#e2e8f0"/><circle cx="50" cy="55" r="2" fill="#e2e8f0"/><circle cx="50" cy="65" r="2" fill="#e2e8f0"/></svg>`
+      },
+      {
+        id: 'batteria',
+        name: 'Batteria',
+        category: 'percussioni',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><ellipse cx="50" cy="65" rx="22" ry="18" fill="#ef4444" stroke="#991b1b" stroke-width="2"/><ellipse cx="50" cy="65" rx="16" ry="12" fill="#fef2f2"/><ellipse cx="25" cy="42" rx="12" ry="7" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/><ellipse cx="75" cy="42" rx="12" ry="7" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/><path d="M30,20 L50,30 L70,20" stroke="#eab308" stroke-width="3" fill="none"/></svg>`
+      },
+      {
+        id: 'tamburo',
+        name: 'Tamburo',
+        category: 'percussioni',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="20" y="35" width="60" height="35" fill="#f43f5e" stroke="#9f1239" stroke-width="2"/><ellipse cx="50" cy="35" rx="30" ry="10" fill="#fff1f2" stroke="#9f1239" stroke-width="2"/><ellipse cx="50" cy="70" rx="30" ry="10" fill="#be123c" stroke="#9f1239" stroke-width="2"/><path d="M22,37 L35,70 M40,37 L55,70 M60,37 L75,70" stroke="#fff" stroke-width="2"/></svg>`
+      },
+      {
+        id: 'xilofono',
+        name: 'Xilofono',
+        category: 'percussioni',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="15" y="20" width="10" height="60" rx="2" fill="#ef4444"/><rect x="28" y="23" width="10" height="54" rx="2" fill="#f97316"/><rect x="41" y="26" width="10" height="48" rx="2" fill="#eab308"/><rect x="54" y="29" width="10" height="42" rx="2" fill="#22c55e"/><rect x="67" y="32" width="10" height="36" rx="2" fill="#06b6d4"/><rect x="80" y="35" width="10" height="30" rx="2" fill="#a855f7"/></svg>`
+      },
+      {
+        id: 'pianoforte',
+        name: 'Pianoforte',
+        category: 'tastiere',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="10" y="25" width="80" height="50" rx="4" fill="#0f172a" stroke="#000" stroke-width="2"/><rect x="15" y="45" width="70" height="25" fill="#fff"/><line x1="25" y1="45" x2="25" y2="70" stroke="#000"/><line x1="35" y1="45" x2="35" y2="70" stroke="#000"/><line x1="45" y1="45" x2="45" y2="70" stroke="#000"/><line x1="55" y1="45" x2="55" y2="70" stroke="#000"/><line x1="65" y1="45" x2="65" y2="70" stroke="#000"/><line x1="75" y1="45" x2="75" y2="70" stroke="#000"/><rect x="21" y="45" width="7" height="15" fill="#000"/><rect x="31" y="45" width="7" height="15" fill="#000"/><rect x="51" y="45" width="7" height="15" fill="#000"/><rect x="61" y="45" width="7" height="15" fill="#000"/><rect x="71" y="45" width="7" height="15" fill="#000"/></svg>`
+      },
+      {
+        id: 'fisarmonica',
+        name: 'Fisarmonica',
+        category: 'tastiere',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full"><rect x="15" y="20" width="20" height="60" rx="3" fill="#dc2626" stroke="#991b1b" stroke-width="2"/><rect x="65" y="20" width="20" height="60" rx="3" fill="#dc2626" stroke="#991b1b" stroke-width="2"/><path d="M35,20 L41,25 L47,20 L53,25 L59,20 L65,20 L65,80 L59,80 L53,75 L47,80 L41,75 L35,80 Z" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/><circle cx="25" cy="30" r="2" fill="#fff"/><circle cx="25" cy="40" r="2" fill="#fff"/><circle cx="25" cy="50" r="2" fill="#fff"/><circle cx="25" cy="60" r="2" fill="#fff"/></svg>`
+      }
+    ];
+
+    let selectedInstrumentId = null;
+    let placedInstruments = {}; // id -> category
+    let audioCtx = null;
+
+    // INIZIALIZZAZIONE
+    window.onload = () => {
+      initGame();
+    };
+
+    function initGame() {
+      placedInstruments = {};
+      selectedInstrumentId = null;
+      document.getElementById('result-modal').classList.add('hidden');
+
+      // Clear zones
+      ['archi', 'fiati', 'percussioni', 'tastiere'].forEach(cat => {
+        document.getElementById(`zone-${cat}`).innerHTML = '';
+      });
+
+      // Render Instruments Pool
+      const pool = document.getElementById('instruments-pool');
+      pool.innerHTML = '';
+
+      // Shuffle strumenti per variabilità
+      const shuffled = [...instrumentsData].sort(() => Math.random() - 0.5);
+
+      shuffled.forEach(inst => {
+        const card = createInstrumentCard(inst);
+        pool.appendChild(card);
+      });
+
+      updatePlacedCount();
+    }
+
+    function createInstrumentCard(inst) {
+      const card = document.createElement('div');
+      card.className = 'card-instrument bg-white border-2 border-slate-200 rounded-2xl p-2.5 w-28 sm:w-32 flex flex-col items-center shadow-sm relative group';
+      card.id = `card-${inst.id}`;
+      card.draggable = true;
+
+      card.innerHTML = `
+        <div class="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none mb-1">
+          ${inst.svg}
+        </div>
+        <span class="font-extrabold text-xs sm:text-sm text-slate-800 text-center leading-tight mb-2">${inst.name}</span>
+        <button onclick="playInstrumentSound('${inst.id}', event)" class="w-full py-1.5 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1 transition-all">
+          <i class="fa-solid fa-volume-high"></i> Ascolta
+        </button>
+      `;
+
+      // Eventi Drag & Drop
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', inst.id);
+        selectCard(inst.id);
+      });
+
+      // Evento Click/Tap per supporto LIM/Tablet
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectCard(inst.id);
+      });
+
+      return card;
+    }
+
+    function selectCard(id) {
+      document.querySelectorAll('.card-instrument').forEach(c => c.classList.remove('selected-card'));
+      selectedInstrumentId = id;
+      const card = document.getElementById(`card-${id}`);
+      if (card) card.classList.add('selected-card');
+    }
+
+    // GESTIONE DROP ZONES (CATEGORIE)
+    document.querySelectorAll('.drop-zone').forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+      });
+
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drag-over');
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const instId = e.dataTransfer.getData('text/plain') || selectedInstrumentId;
+        if (instId) {
+          moveInstrumentToCategory(instId, zone.dataset.category);
+        }
+      });
+    });
+
+    function handleZoneClick(category) {
+      if (selectedInstrumentId) {
+        moveInstrumentToCategory(selectedInstrumentId, category);
+      }
+    }
+
+    function moveInstrumentToCategory(instId, category) {
+      const card = document.getElementById(`card-${instId}`);
+      const targetZone = document.getElementById(`zone-${category}`);
+      if (!card || !targetZone) return;
+
+      card.classList.remove('selected-card');
+      targetZone.appendChild(card);
+      placedInstruments[instId] = category;
+      selectedInstrumentId = null;
+
+      updatePlacedCount();
+    }
+
+    function updatePlacedCount() {
+      const count = Object.keys(placedInstruments).length;
+      document.getElementById('placed-count').textContent = `${count} / 11 inseriti`;
+    }
+
+    // --- SINTETIZZATORE SINTETICO AUDIO WEB API (3 SECONDI ROBUTISTO) ---
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playInstrumentSound(instId, event) {
+      if (event) event.stopPropagation();
+      initAudioContext();
+
+      const now = audioCtx.currentTime;
+      const duration = 3.0; // Durata esatta di 3 secondi
+
+      switch (instId) {
+
+        case 'violino': {
+          // Melodia acuta ad arco (La4 -> Do5 -> Re5) con vibrato di 3 secondi
+          const notes = [440, 523.25, 587.33];
+          notes.forEach((freq, idx) => {
+            const t = now + idx * 1.0;
+            const osc = audioCtx.createOscillator();
+            const lfo = audioCtx.createOscillator();
+            const lfoGain = audioCtx.createGain();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, t);
+
+            lfo.frequency.setValueAtTime(6, t);
+            lfoGain.gain.setValueAtTime(10, t);
+            lfo.connect(osc.frequency);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.3, t + 0.15);
+            gain.gain.setValueAtTime(0.3, t + 0.85);
+            gain.gain.linearRampToValueAtTime(0.001, t + 1.0);
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            lfo.start(t); osc.start(t);
+            lfo.stop(t + 1.0); osc.stop(t + 1.0);
+          });
+          break;
+        }
+
+        case 'chitarra': {
+          // Arpeggio di 6 note pizzicate acustiche (3 secondi)
+          const notes = [164.81, 220.00, 293.66, 329.63, 440.00, 659.25];
+          notes.forEach((freq, idx) => {
+            const t = now + idx * 0.5;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(0.5, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 1.2);
+          });
+          break;
+        }
+
+        case 'violoncello': {
+          // Nota grave sostenuta con vibrato caldo (3 secondi)
+          const osc = audioCtx.createOscillator();
+          const lfo = audioCtx.createOscillator();
+          const lfoGain = audioCtx.createGain();
+          const filter = audioCtx.createBiquadFilter();
+          const gain = audioCtx.createGain();
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(130.81, now); // Do3
+
+          lfo.frequency.setValueAtTime(4.5, now);
+          lfoGain.gain.setValueAtTime(4, now);
+          lfo.connect(osc.frequency);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(700, now);
+
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(0.45, now + 0.3);
+          gain.gain.setValueAtTime(0.45, now + 2.4);
+          gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+          osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+          lfo.start(now); osc.start(now);
+          lfo.stop(now + duration); osc.stop(now + duration);
+          break;
+        }
+
+        case 'flauto': {
+          // Melodia di flauto dolce con soffio d'aria (3 secondi)
+          const notes = [587.33, 659.25, 783.99];
+          notes.forEach((freq, idx) => {
+            const t = now + idx * 1.0;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.35, t + 0.2);
+            gain.gain.setValueAtTime(0.35, t + 0.8);
+            gain.gain.linearRampToValueAtTime(0.001, t + 1.0);
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 1.0);
+          });
+          break;
+        }
+
+        case 'tromba': {
+          // Squillo di fanfara metallica su 3 note (Do -> Mi -> Sol)
+          const notes = [261.63, 329.63, 392.00];
+          const durations = [0.6, 0.6, 1.8];
+          let accumulatedTime = 0;
+
+          notes.forEach((freq, idx) => {
+            const t = now + accumulatedTime;
+            const d = durations[idx];
+            accumulatedTime += d;
+
+            const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, t);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1200, t);
+            filter.frequency.exponentialRampToValueAtTime(3800, t + 0.1);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+            gain.gain.setValueAtTime(0.4, t + d - 0.1);
+            gain.gain.linearRampToValueAtTime(0.001, t + d);
+
+            osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + d);
+          });
+          break;
+        }
+
+        case 'clarinetto': {
+          // Fraseggio caldo in registro medio-grave di 3 secondi
+          const notes = [220.00, 261.63, 329.63];
+          notes.forEach((freq, idx) => {
+            const t = now + idx * 1.0;
+            const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, t);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(950, t);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.35, t + 0.2);
+            gain.gain.setValueAtTime(0.35, t + 0.8);
+            gain.gain.linearRampToValueAtTime(0.001, t + 1.0);
+
+            osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 1.0);
+          });
+          break;
+        }
+
+        case 'batteria': {
+          // Ritmo batteria rock di 3 secondi (BPM 120)
+          const playKick = (t) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(130, t);
+            osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+            gain.gain.setValueAtTime(0.8, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.2);
+          };
+
+          const playSnare = (t) => {
+            const bufSize = audioCtx.sampleRate * 0.15;
+            const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buf;
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.4, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+            noise.connect(gain); gain.connect(audioCtx.destination);
+            noise.start(t);
+          };
+
+          const playHiHat = (t) => {
+            const bufSize = audioCtx.sampleRate * 0.05;
+            const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buf;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(7000, t);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            noise.start(t);
+          };
+
+          const step = 0.375;
+          [0, 2, 4, 6].forEach(s => playKick(now + s * step));
+          [1, 3, 5, 7].forEach(s => playSnare(now + s * step));
+          for (let i = 0; i < 8; i++) playHiHat(now + i * step);
+          break;
+        }
+
+        case 'tamburo': {
+          // Rullo di tamburo da marcia di 3 secondi con colpo finale
+          const totalHits = 24;
+          const interval = (duration - 0.3) / totalHits;
+          for (let i = 0; i < totalHits; i++) {
+            const t = now + (i * interval);
+            const bufSize = audioCtx.sampleRate * 0.08;
+            const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let j = 0; j < bufSize; j++) d[j] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buf;
+
+            const gain = audioCtx.createGain();
+            const vol = (i === totalHits - 1) ? 0.7 : 0.15 + (i / totalHits) * 0.25;
+            gain.gain.setValueAtTime(vol, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+
+            noise.connect(gain); gain.connect(audioCtx.destination);
+            noise.start(t);
+          }
+          break;
+        }
+
+        case 'xilofono': {
+          // Sequenza veloce di note di legno (3 secondi)
+          const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 659.25, 523.25, 659.25];
+          notes.forEach((freq, idx) => {
+            const t = now + (idx * 0.35);
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(0.6, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.35);
+          });
+          break;
+        }
+
+        case 'pianoforte': {
+          // Arpeggio di pianoforte brillante a due mani di 3 secondi
+          const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
+          notes.forEach((freq, i) => {
+            const t = now + i * 0.12;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(0.4, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(now + duration);
+          });
+          break;
+        }
+
+        case 'fisarmonica': {
+          // Accordo di fisarmonica con battimento musette (3 secondi)
+          const notes = [261.63, 329.63, 392.00];
+          notes.forEach(freq => {
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc1.type = 'sawtooth';
+            osc2.type = 'sawtooth';
+
+            osc1.frequency.setValueAtTime(freq, now);
+            osc2.frequency.setValueAtTime(freq * 1.008, now); // Detune per effetto mantice
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.2, now + 0.2);
+            gain.gain.setValueAtTime(0.2, now + 2.5);
+            gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+            osc1.connect(gain); osc2.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc1.start(now); osc2.start(now);
+            osc1.stop(now + duration); osc2.stop(now + duration);
+          });
+          break;
+        }
+      }
+    }
+
+    // VERIFICA DELLE RISPOSTE
+    function checkAnswers() {
+      let score = 0;
+
+      instrumentsData.forEach(inst => {
+        const card = document.getElementById(`card-${inst.id}`);
+        if (!card) return;
+
+        const currentCategory = placedInstruments[inst.id];
+        card.classList.remove('correct-card', 'wrong-card');
+
+        if (currentCategory === inst.category) {
+          card.classList.add('correct-card');
+          score++;
+        } else if (currentCategory) {
+          card.classList.add('wrong-card');
+        }
+      });
+
+      showModal(score);
+    }
+
+    function showModal(score) {
+      const modal = document.getElementById('result-modal');
+      const title = document.getElementById('modal-title');
+      const msg = document.getElementById('modal-message');
+      const scoreElem = document.getElementById('modal-score');
+      const badge = document.getElementById('modal-badge');
+
+      scoreElem.textContent = `${score} / 11`;
+
+      if (score === 11) {
+        title.textContent = 'Bravissimo! 🎉';
+        msg.textContent = 'Hai classificato correttamente tutti gli strumenti musicali! Sei un vero maestro di musica!';
+        badge.className = 'w-20 h-20 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-4xl mb-4';
+        badge.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+      } else if (score >= 7) {
+        title.textContent = 'Buon Lavoro! 👍';
+        msg.textContent = 'Hai posizionato gran parte degli strumenti. Riascolta i suoni di quelli evidenziati in rosso per correggere gli errori!';
+        badge.className = 'w-20 h-20 mx-auto rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-4xl mb-4';
+        badge.innerHTML = '<i class="fa-solid fa-star"></i>';
+      } else {
+        title.textContent = 'Continua a Provare! 💪';
+        msg.textContent = 'Alcuni strumenti si trovano nella famiglia sbagliata. Premi sui tasti audio 🔊 per riconoscerli meglio!';
+        badge.className = 'w-20 h-20 mx-auto rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-4xl mb-4';
+        badge.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('result-modal').classList.add('hidden');
+    }
+
+    function resetGame() {
+      initGame();
+    }
+  </script>
+</body>
+</html>
