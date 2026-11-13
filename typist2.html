@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cacciatore di Galassie: Space Typist</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka & Inter per alta leggibilità (anche DSA) -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Fredoka', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        spaceBg: '#0b0f19',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Fredoka', 'Inter', sans-serif;
+            user-select: none;
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        #game-canvas {
+            background: radial-gradient(circle at center, #131b2e 0%, #070a10 100%);
+            touch-action: none;
+        }
+
+        /* Effetti luminosi sui tasti */
+        .key-active {
+            transform: translateY(2px) scale(0.95);
+            box-shadow: 0 0 15px currentColor;
+        }
+        .key-target {
+            animation: pulse-glow 0.8s infinite alternate;
+            border-color: #ffffff !important;
+            box-shadow: 0 0 20px #facc15, inset 0 0 10px #facc15 !important;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(1); filter: brightness(1); }
+            100% { transform: scale(1.08); filter: brightness(1.3); }
+        }
+
+        /* Modalità Alto Contrasto */
+        .high-contrast {
+            background-color: #000000 !important;
+            filter: contrast(130%);
+        }
+
+        /* Pannello impostazioni chiaro e ad alta leggibilità */
+        .settings-panel {
+            background: rgba(51, 65, 85, 0.96);
+            border: 2px solid #94a3b8;
+        }
+
+        /* Modalità Minuscolo per tastiera */
+        .text-lowercase-mode {
+            text-transform: lowercase;
+        }
+
+        /* Effetto testo neon */
+        .neon-glow {
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.6), 0 0 30px rgba(168, 85, 247, 0.4);
+        }
+
+        /* Stili tastiera virtuale */
+        .keyboard-key {
+            flex: 1;
+            max-width: 38px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #ffffff;
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
+
+        @media (min-width: 640px) {
+            .keyboard-key {
+                max-width: 44px;
+                height: 42px;
+                font-size: 0.95rem;
+            }
+        }
+
+        .keyboard-key[data-finger="pinky"] { background-color: #831843; border-color: #ec4899; color: #fbcfe8; }
+        .keyboard-key[data-finger="ring"] { background-color: #1e3a8a; border-color: #3b82f6; color: #bfdbfe; }
+        .keyboard-key[data-finger="middle"] { background-color: #064e3b; border-color: #10b981; color: #a7f3d0; }
+        .keyboard-key[data-finger="indexL"] { background-color: #78350f; border-color: #f59e0b; color: #fef3c7; }
+        .keyboard-key[data-finger="indexR"] { background-color: #4c1d95; border-color: #8b5cf6; color: #ddd6fe; }
+        .keyboard-key[data-finger="thumb"] { background-color: #334155; border-color: #64748b; color: #cbd5e1; }
+
+        /* Stili per stampa / download report */
+        @media print {
+            body { background: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            #printable-report { 
+                display: block !important; 
+                background: white !important; 
+                color: black !important; 
+                border: 2px solid #333 !important;
+            }
+            #printable-report * { color: black !important; background: transparent !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center bg-spaceBg text-white antialiased">
+
+    <!-- INTESTAZIONE DI GIOCO (Visibile durante la partita) -->
+    <header id="main-header" class="w-full max-w-6xl px-4 py-3 flex flex-wrap justify-between items-center border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 hidden">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30">
+                🚀
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide bg-gradient-to-r from-cyan-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
+                    Space Typist
+                </h1>
+                <p id="hud-level-title" class="text-xs text-slate-400">Livello 1: Lettera Singola</p>
+            </div>
+        </div>
+
+        <!-- Statistiche HUD -->
+        <div class="flex items-center space-x-3 sm:space-x-4 text-sm font-semibold my-2 sm:my-0">
+            <!-- Timer -->
+            <div class="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2">
+                <span class="text-cyan-400 text-lg">⏳</span>
+                <div>
+                    <span class="text-[10px] text-slate-400 block leading-none uppercase">Tempo</span>
+                    <span id="hud-timer" class="text-base text-cyan-300 font-bold">02:00</span>
+                </div>
+            </div>
+
+            <!-- Punteggio -->
+            <div class="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2">
+                <span class="text-amber-400 text-lg">⭐</span>
+                <div>
+                    <span class="text-[10px] text-slate-400 block leading-none uppercase">Punti</span>
+                    <span id="hud-score" class="text-base text-amber-300 font-bold">0</span>
+                </div>
+            </div>
+
+            <!-- Precisione -->
+            <div class="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2">
+                <span class="text-emerald-400 text-lg">🎯</span>
+                <div>
+                    <span class="text-[10px] text-slate-400 block leading-none uppercase">Precisione</span>
+                    <span id="hud-accuracy" class="text-base text-emerald-300 font-bold">100%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pulsanti Pausa, Audio e Contrasto -->
+        <div class="flex items-center space-x-2">
+            <button id="btn-pause" onclick="togglePause()" title="Pausa Gioco" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-extrabold text-sm transition shadow-lg flex items-center space-x-1">
+                <span>⏸️ Pausa</span>
+            </button>
+            <button id="btn-sound" onclick="toggleAudio()" title="Attiva/Disattiva Audio" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition">
+                🔊
+            </button>
+            <button id="btn-contrast" onclick="toggleHighContrast()" title="Modalità Alto Contrasto" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition">
+                👁️
+            </button>
+        </div>
+    </header>
+
+    <!-- 1. SCHERMATA INIZIALE (HERO) -->
+    <section id="screen-home" class="w-full max-w-4xl min-h-[85vh] flex flex-col items-center justify-center text-center p-6 my-auto">
+        <div class="relative mb-6">
+            <div class="absolute -inset-4 bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500 rounded-full blur-2xl opacity-40 animate-pulse"></div>
+            <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-3xl bg-slate-900 border-2 border-cyan-400/50 flex items-center justify-center text-6xl sm:text-7xl shadow-2xl">
+                🚀
+            </div>
+        </div>
+
+        <h1 class="text-4xl sm:text-6xl font-black tracking-tight mb-3 bg-gradient-to-r from-cyan-300 via-indigo-200 to-pink-400 bg-clip-text text-transparent neon-glow">
+            Cacciatore di Galassie
+        </h1>
+        <p class="text-xl sm:text-2xl font-bold text-cyan-400 mb-3">Space Typist</p>
+        <p class="text-slate-200 text-base sm:text-lg max-w-xl mb-8 leading-relaxed">
+            Impara a digitare sulla tastiera come un vero pilota spaziale! Distruggi gli asteroidi usando le dita giuste prima che raggiungano la navicella.
+        </p>
+
+        <button onclick="goToSettings()" class="group relative px-12 py-6 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-slate-950 font-black text-2xl sm:text-3xl rounded-3xl shadow-2xl shadow-emerald-500/40 transform hover:-translate-y-1 hover:scale-105 transition-all duration-200 flex items-center space-x-3">
+            <span>🎮 GIOCA</span>
+            <span class="group-hover:translate-x-2 transition-transform">➔</span>
+        </button>
+
+        <div class="mt-12 flex flex-wrap justify-center gap-6 text-sm text-slate-300 font-semibold">
+            <span class="flex items-center space-x-1.5"><span class="text-amber-400">✨</span><span>Tastiera Colorata Guidata</span></span>
+            <span class="flex items-center space-x-1.5"><span class="text-emerald-400">🎯</span><span>5 Livelli Progressivi</span></span>
+            <span class="flex items-center space-x-1.5"><span class="text-cyan-400">📊</span><span>Report Scaricabile Finale</span></span>
+        </div>
+    </section>
+
+    <!-- 2. SCHERMATA IMPOSTAZIONI E REGOLE -->
+    <section id="screen-settings" class="w-full max-w-4xl p-4 sm:p-6 my-auto hidden">
+        <div class="settings-panel rounded-3xl p-6 sm:p-8 shadow-2xl text-white">
+            <h2 class="text-3xl sm:text-4xl font-black text-amber-300 mb-6 flex items-center space-x-3 border-b-2 border-slate-400 pb-4">
+                <span>⚙️ Impostazioni di Gioco</span>
+            </h2>
+
+            <!-- Selezione Livello (5 Livelli) -->
+            <div class="mb-8">
+                <label class="block text-xl sm:text-2xl font-extrabold tracking-wide text-cyan-200 mb-4">
+                    1. Scegli il Livello:
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <button onclick="selectLevel(1)" id="level-card-1" class="level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-indigo-700 border-amber-300 ring-4 ring-amber-300/40">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="font-black text-lg text-white">Livello 1</span>
+                            <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-lg text-white font-extrabold">1 Lettera</span>
+                        </div>
+                        <p class="text-base font-semibold text-white">Singole lettere italiane (A, S, D, F, J...)</p>
+                    </button>
+
+                    <button onclick="selectLevel(2)" id="level-card-2" class="level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-slate-600 border-slate-400 hover:border-white">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="font-black text-lg text-cyan-200">Livello 2</span>
+                            <span class="text-xs bg-cyan-700 px-2.5 py-1 rounded-lg text-white font-extrabold">2 Lettere</span>
+                        </div>
+                        <p class="text-base font-semibold text-slate-100">Coppie di lettere (DI, NO, LA, MA...)</p>
+                    </button>
+
+                    <button onclick="selectLevel(3)" id="level-card-3" class="level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-slate-600 border-slate-400 hover:border-white">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="font-black text-lg text-emerald-200">Livello 3</span>
+                            <span class="text-xs bg-emerald-700 px-2.5 py-1 rounded-lg text-white font-extrabold">3 Lettere</span>
+                        </div>
+                        <p class="text-base font-semibold text-slate-100">Parole di 3 lettere (SOL, ZOO, VIA...)</p>
+                    </button>
+
+                    <button onclick="selectLevel(4)" id="level-card-4" class="level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-slate-600 border-slate-400 hover:border-white">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="font-black text-lg text-amber-200">Livello 4</span>
+                            <span class="text-xs bg-amber-700 px-2.5 py-1 rounded-lg text-white font-extrabold">4 Lettere</span>
+                        </div>
+                        <p class="text-base font-semibold text-slate-100">Parole di 4 lettere (SOLE, MARE, LUNA...)</p>
+                    </button>
+
+                    <button onclick="selectLevel(5)" id="level-card-5" class="level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-slate-600 border-slate-400 hover:border-white sm:col-span-2 md:col-span-1">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="font-black text-lg text-pink-200">Livello 5</span>
+                            <span class="text-xs bg-pink-700 px-2.5 py-1 rounded-lg text-white font-extrabold">5 Lettere</span>
+                        </div>
+                        <p class="text-base font-semibold text-slate-100">Parole di 5 lettere (GATTO, TRENO...)</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Durata, Velocità e Stile Lettere -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+                <!-- Durata -->
+                <div>
+                    <label class="block text-lg sm:text-xl font-extrabold tracking-wide text-cyan-200 mb-2">
+                        2. Tempo di Gioco:
+                    </label>
+                    <select id="setting-duration" class="w-full bg-slate-600 border-2 border-slate-300 text-white rounded-2xl p-4 text-lg font-bold focus:outline-none focus:border-amber-300">
+                        <option value="30">⚡ 30 Secondi</option>
+                        <option value="60">⏱️ 1 Minuto</option>
+                        <option value="120" selected>⏱️ 2 Minuti (Base)</option>
+                        <option value="180">⏱️ 3 Minuti</option>
+                        <option value="300">⏱️ 5 Minuti</option>
+                        <option value="0">🧘 Senza Tempo (Relax)</option>
+                    </select>
+                </div>
+
+                <!-- Velocità -->
+                <div>
+                    <label class="block text-lg sm:text-xl font-extrabold tracking-wide text-cyan-200 mb-2">
+                        3. Velocità Asteroidi:
+                    </label>
+                    <select id="setting-speed" class="w-full bg-slate-600 border-2 border-slate-300 text-white rounded-2xl p-4 text-lg font-bold focus:outline-none focus:border-amber-300">
+                        <option value="0.7">🐢 Lenta</option>
+                        <option value="1.0" selected>🚀 Media</option>
+                        <option value="1.5">⚡ Veloce</option>
+                        <option value="2.0">🔥 Molto Veloce</option>
+                    </select>
+                </div>
+
+                <!-- Maiuscolo / Minuscolo -->
+                <div>
+                    <label class="block text-lg sm:text-xl font-extrabold tracking-wide text-cyan-200 mb-2">
+                        4. Stile Lettere:
+                    </label>
+                    <select id="setting-case" class="w-full bg-slate-600 border-2 border-slate-300 text-white rounded-2xl p-4 text-lg font-bold focus:outline-none focus:border-amber-300">
+                        <option value="uppercase" selected>🔤 ABC (Maiuscolo)</option>
+                        <option value="lowercase">abc (Minuscolo)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Regole Riassunte e Leggibili -->
+            <div class="bg-slate-600/95 rounded-2xl border-2 border-slate-400 p-5 mb-8 text-white">
+                <div class="font-extrabold text-amber-300 text-lg sm:text-xl flex items-center space-x-2 mb-3">
+                    <span>💡 Come si gioca:</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-base">
+                    <div class="bg-slate-700 p-3.5 rounded-xl border border-slate-400">
+                        <span class="font-extrabold text-amber-300 block text-lg mb-1">1. Guarda e Scrivi</span>
+                        Digita sulla tastiera le lettere che vedi sugli asteroidi.
+                    </div>
+                    <div class="bg-slate-700 p-3.5 rounded-xl border border-slate-400">
+                        <span class="font-extrabold text-amber-300 block text-lg mb-1">2. Segui i Colori</span>
+                        Ogni colore indica quale dito usare sulla tastiera.
+                    </div>
+                    <div class="bg-slate-700 p-3.5 rounded-xl border border-slate-400">
+                        <span class="font-extrabold text-amber-300 block text-lg mb-1">3. Tasti F e J</span>
+                        Appoggia gli indici sui tasti <b>F</b> e <b>J</b> come base.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pulsanti Azione -->
+            <div class="flex justify-between items-center pt-2">
+                <button onclick="goToHome()" class="px-6 py-4 bg-slate-600 hover:bg-slate-500 text-white font-extrabold rounded-2xl text-lg transition border-2 border-slate-400">
+                    ← Indietro
+                </button>
+                <button onclick="startMission()" class="px-10 py-4 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xl sm:text-2xl rounded-2xl shadow-xl shadow-emerald-500/30 transform hover:-translate-y-0.5 transition">
+                    🚀 INIZIA PARTITA
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. SCHERMATA DI GIOCO (CANVAS + TASTIERA GUIDATA) -->
+    <main id="screen-game" class="w-full max-w-6xl flex-grow flex flex-col items-center justify-between p-2 sm:p-4 gap-3 relative hidden">
+        
+        <!-- CONTENITORE CANVAS -->
+        <div class="relative w-full aspect-[16/9] max-h-[48vh] min-h-[280px] rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex justify-center items-center">
+            <canvas id="game-canvas" class="w-full h-full block"></canvas>
+
+            <!-- FINESTRA DI PAUSA CON I 3 TASTI RICHIESTI -->
+            <div id="pause-modal" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 hidden">
+                <div class="bg-slate-800 border-2 border-amber-400 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                    <div class="text-5xl mb-3">⏸️</div>
+                    <h3 class="text-3xl font-black text-white mb-6">Gioco in Pausa</h3>
+                    
+                    <div class="flex flex-col gap-3">
+                        <button onclick="resumeGame()" class="w-full py-4 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xl rounded-2xl shadow-lg transition">
+                            ▶️ Riprendi
+                        </button>
+                        <button onclick="restartGame()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-lg rounded-2xl border border-indigo-400 transition">
+                            🔄 Ricomincia
+                        </button>
+                        <button onclick="abortGame()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-lg rounded-2xl border border-rose-400 transition">
+                            🚪 Abbandona
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messaggi di incoraggiamento -->
+            <div id="toast-message" class="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-4 bg-gradient-to-r from-amber-500 to-pink-500 text-white font-extrabold px-6 py-2 rounded-full shadow-lg text-lg flex items-center space-x-2 z-20">
+                <span id="toast-icon">🌟</span>
+                <span id="toast-text">Ottimo Lavoro!</span>
+            </div>
+
+            <!-- Box Suggerimento Dito (Accessibilità 104) -->
+            <div id="guide-box" class="absolute bottom-3 left-3 bg-slate-900/90 border border-amber-500/50 px-3.5 py-2 rounded-2xl flex items-center space-x-3 shadow-xl backdrop-blur-md z-10">
+                <div class="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-base animate-pulse">
+                    👉
+                </div>
+                <div>
+                    <div class="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Prossimo Tasto</div>
+                    <div class="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                        <span>Premere:</span>
+                        <span id="guide-key-name" class="px-2 py-0.5 bg-amber-500 text-slate-950 rounded font-mono font-black text-sm">F</span>
+                        <span id="guide-finger-name" class="text-slate-300 font-normal text-[11px] ml-1">(Indice SX)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TASTIERA VIRTUALE COLORATA A SCHERMO -->
+        <div class="w-full bg-slate-900/90 rounded-3xl border border-slate-800 p-2.5 sm:p-3 shadow-xl backdrop-blur-md">
+            <!-- Legenda Colori Dita -->
+            <div class="flex flex-wrap items-center justify-center gap-3 mb-2 text-[11px] font-semibold text-slate-300 border-b border-slate-800 pb-1.5">
+                <span class="text-slate-400 font-bold uppercase tracking-wide text-[9px]">Guida Dita:</span>
+                <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block"></span><span>Mignolo</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span><span>Anulare</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span><span>Medio</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block ring-2 ring-amber-300"></span><span class="text-amber-300 font-bold">Indice SX (F)</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block ring-2 ring-purple-300"></span><span class="text-purple-300 font-bold">Indice DX (J)</span></div>
+            </div>
+
+            <!-- Griglia Tastiera QWERTY -->
+            <div id="virtual-keyboard" class="flex flex-col gap-1 max-w-4xl mx-auto">
+                <!-- Fila 1 -->
+                <div class="flex justify-center gap-1 w-full">
+                    <div data-key="1" data-finger="pinky" class="keyboard-key">1</div>
+                    <div data-key="2" data-finger="ring" class="keyboard-key">2</div>
+                    <div data-key="3" data-finger="middle" class="keyboard-key">3</div>
+                    <div data-key="4" data-finger="indexL" class="keyboard-key">4</div>
+                    <div data-key="5" data-finger="indexL" class="keyboard-key">5</div>
+                    <div data-key="6" data-finger="indexR" class="keyboard-key">6</div>
+                    <div data-key="7" data-finger="indexR" class="keyboard-key">7</div>
+                    <div data-key="8" data-finger="middle" class="keyboard-key">8</div>
+                    <div data-key="9" data-finger="ring" class="keyboard-key">9</div>
+                    <div data-key="0" data-finger="pinky" class="keyboard-key">0</div>
+                </div>
+
+                <!-- Fila 2 -->
+                <div class="flex justify-center gap-1 w-full">
+                    <div data-key="Q" data-finger="pinky" class="keyboard-key">Q</div>
+                    <div data-key="W" data-finger="ring" class="keyboard-key">W</div>
+                    <div data-key="E" data-finger="middle" class="keyboard-key">E</div>
+                    <div data-key="R" data-finger="indexL" class="keyboard-key">R</div>
+                    <div data-key="T" data-finger="indexL" class="keyboard-key">T</div>
+                    <div data-key="Y" data-finger="indexR" class="keyboard-key">Y</div>
+                    <div data-key="U" data-finger="indexR" class="keyboard-key">U</div>
+                    <div data-key="I" data-finger="middle" class="keyboard-key">I</div>
+                    <div data-key="O" data-finger="ring" class="keyboard-key">O</div>
+                    <div data-key="P" data-finger="pinky" class="keyboard-key">P</div>
+                </div>
+
+                <!-- Fila 3 (Fila Base F e J) -->
+                <div class="flex justify-center gap-1 w-full">
+                    <div data-key="A" data-finger="pinky" class="keyboard-key">A</div>
+                    <div data-key="S" data-finger="ring" class="keyboard-key">S</div>
+                    <div data-key="D" data-finger="middle" class="keyboard-key">D</div>
+                    <div data-key="F" data-finger="indexL" class="keyboard-key relative border-2 border-amber-400 font-extrabold shadow-md shadow-amber-500/20">
+                        F
+                        <span class="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-3 h-0.5 bg-amber-400 rounded-full"></span>
+                    </div>
+                    <div data-key="G" data-finger="indexL" class="keyboard-key">G</div>
+                    <div data-key="H" data-finger="indexR" class="keyboard-key">H</div>
+                    <div data-key="J" data-finger="indexR" class="keyboard-key relative border-2 border-purple-400 font-extrabold shadow-md shadow-purple-500/20">
+                        J
+                        <span class="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-3 h-0.5 bg-purple-400 rounded-full"></span>
+                    </div>
+                    <div data-key="K" data-finger="middle" class="keyboard-key">K</div>
+                    <div data-key="L" data-finger="ring" class="keyboard-key">L</div>
+                    <div data-key="Ç" data-finger="pinky" class="keyboard-key">Ç</div>
+                    <div data-key="Ò" data-finger="pinky" class="keyboard-key">Ò</div>
+                    <div data-key="À" data-finger="pinky" class="keyboard-key">À</div>
+                </div>
+
+                <!-- Fila 4 -->
+                <div class="flex justify-center gap-1 w-full">
+                    <div data-key="Z" data-finger="pinky" class="keyboard-key">Z</div>
+                    <div data-key="X" data-finger="ring" class="keyboard-key">X</div>
+                    <div data-key="C" data-finger="middle" class="keyboard-key">C</div>
+                    <div data-key="V" data-finger="indexL" class="keyboard-key">V</div>
+                    <div data-key="B" data-finger="indexL" class="keyboard-key">B</div>
+                    <div data-key="N" data-finger="indexR" class="keyboard-key">N</div>
+                    <div data-key="M" data-finger="middle" class="keyboard-key">M</div>
+                    <div data-key="," data-finger="ring" class="keyboard-key">,</div>
+                    <div data-key="." data-finger="pinky" class="keyboard-key">.</div>
+                </div>
+
+                <!-- Barra Spaziatrice -->
+                <div class="flex justify-center gap-1 w-full mt-0.5">
+                    <div data-key=" " data-finger="thumb" class="keyboard-key flex-grow max-w-xs h-7 text-[10px] tracking-widest text-slate-400 uppercase">
+                        Spazio (Pollici)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 4. SCHERMATA REPORT FINALE SCARICABILE -->
+    <section id="screen-report" class="w-full max-w-3xl p-4 sm:p-6 my-auto hidden">
+        <div class="bg-slate-900/95 rounded-3xl border border-slate-800 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+            
+            <div class="text-center mb-6">
+                <div class="text-5xl mb-2" id="report-stars">⭐⭐⭐</div>
+                <h2 class="text-3xl font-black text-white mb-1">Missione Completata!</h2>
+                <p class="text-sm text-cyan-400 font-semibold">Ecco il resoconto dettagliato del tuo allenamento</p>
+            </div>
+
+            <!-- AREA STAMPABILE / SCARICABILE DEL REPORT -->
+            <div id="printable-report" class="bg-slate-950 rounded-2xl border border-slate-800 p-5 mb-6 text-sm">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white">🚀 Space Typist - Report Didattico</h3>
+                        <p class="text-xs text-slate-400" id="report-date">Data: --/--/----</p>
+                    </div>
+                    <span class="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30">
+                        Legge 104 Accessibile
+                    </span>
+                </div>
+
+                <!-- Riepilogo Impostazioni -->
+                <div class="mb-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">⚙️ Impostazioni Utilizzate:</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-900 p-3 rounded-xl">
+                        <div><span class="text-slate-400 block">Livello:</span><span id="rep-level" class="font-bold text-white">-</span></div>
+                        <div><span class="text-slate-400 block">Durata:</span><span id="rep-duration" class="font-bold text-white">-</span></div>
+                        <div><span class="text-slate-400 block">Velocità Asteroidi:</span><span id="rep-speed" class="font-bold text-white">-</span></div>
+                        <div><span class="text-slate-400 block">Stile Lettere:</span><span id="rep-case" class="font-bold text-white">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Risultati Ottenuti -->
+                <div class="mb-5">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">📊 Risultati Ottenuti:</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 text-xs block">Punteggio</span>
+                            <span id="rep-score" class="text-xl font-bold text-amber-400">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 text-xs block">Precisione</span>
+                            <span id="rep-accuracy" class="text-xl font-bold text-emerald-400">0%</span>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 text-xs block">Completati</span>
+                            <span id="rep-completed" class="text-xl font-bold text-cyan-400">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 text-xs block">Velocità WPM</span>
+                            <span id="rep-wpm" class="text-xl font-bold text-purple-400">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista Parole/Lettere Corrette -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        ✅ Elementi Digitati Correttamente (<span id="rep-list-count">0</span>):
+                    </h4>
+                    <div id="rep-words-container" class="max-h-36 overflow-y-auto bg-slate-900 p-3 rounded-xl flex flex-wrap gap-1.5 text-xs font-mono text-emerald-300 border border-slate-800">
+                        <!-- Riempito dinamicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pulsanti Report -->
+            <div class="flex flex-wrap justify-between items-center gap-3 no-print">
+                <button onclick="downloadReport()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition flex items-center space-x-2">
+                    <span>📄 Scarica / Stampa Report</span>
+                </button>
+                <div class="flex space-x-2">
+                    <button onclick="goToSettings()" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition">
+                        ⚙️ Impostazioni
+                    </button>
+                    <button onclick="startMission()" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-sm transition shadow-lg shadow-emerald-500/30">
+                        🔄 Gioca Ancora
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LOGICA JAVASCRIPT DEL GIOCO -->
+    <script>
+        // --- SINTETIZZATORE AUDIO WEB AUDIO API ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            }
+
+            playLaser() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(750, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playExplosion() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(250, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.18);
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.18);
+            }
+
+            playSoftError() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playSuccess() {
+                if (this.muted || !this.ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.07);
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime + idx * 0.07);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.07 + 0.18);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.07);
+                    osc.stop(this.ctx.currentTime + idx * 0.07 + 0.18);
+                });
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- VOCABOLARIO ITALIANO E 5 LIVELLI ---
+        const LEVEL_CONFIGS = {
+            1: {
+                title: "Livello 1: Lettera Singola",
+                items: ["A", "S", "D", "F", "J", "K", "L", "E", "R", "T", "O", "I", "U", "C", "V", "B", "N", "M"]
+            },
+            2: {
+                title: "Livello 2: Due Lettere",
+                items: ["DI", "NO", "SI", "LA", "MA", "TE", "SU", "FA", "DA", "ME", "SO", "RE", "MI", "VA", "HO", "TU"]
+            },
+            3: {
+                title: "Livello 3: Tre Lettere",
+                items: ["SOL", "ZOO", "MIA", "ZIO", "BAR", "VIA", "BLU", "ERA", "POI", "TRA", "TRE", "VAI", "QUI", "REI", "APE"]
+            },
+            4: {
+                title: "Livello 4: Quattro Lettere",
+                items: ["SOLE", "MARE", "LUNA", "CASA", "PANE", "VOTO", "ORSO", "RETE", "PINO", "LAGO", "ROSA", "VINO", "NIDO", "LATO"]
+            },
+            5: {
+                title: "Livello 5: Cinque Lettere",
+                items: ["AEREO", "GATTO", "LIBRO", "AMICO", "TRENO", "FIORE", "TESTA", "MONTE", "ISOLA", "PRATO", "CARTA", "STELLA"]
+            }
+        };
+
+        const FINGER_MAP = {
+            'A': 'Mignolo SX', 'Q': 'Mignolo SX', 'Z': 'Mignolo SX', '1': 'Mignolo SX',
+            'S': 'Anulare SX', 'W': 'Anulare SX', 'X': 'Anulare SX', '2': 'Anulare SX',
+            'D': 'Medio SX', 'E': 'Medio SX', 'C': 'Medio SX', '3': 'Medio SX',
+            'F': 'Indice SX ⭐', 'R': 'Indice SX', 'V': 'Indice SX', 'G': 'Indice SX', 'T': 'Indice SX', 'B': 'Indice SX', '4': 'Indice SX', '5': 'Indice SX',
+            'J': 'Indice DX ⭐', 'U': 'Indice DX', 'N': 'Indice DX', 'H': 'Indice DX', 'Y': 'Indice DX', 'M': 'Indice DX', '6': 'Indice DX', '7': 'Indice DX',
+            'K': 'Medio DX', 'I': 'Medio DX', ',': 'Medio DX', '8': 'Medio DX',
+            'L': 'Anulare DX', 'O': 'Anulare DX', '.': 'Anulare DX', '9': 'Anulare DX',
+            'Ç': 'Mignolo DX', 'P': 'Mignolo DX', 'Ò': 'Mignolo DX', 'À': 'Mignolo DX', '0': 'Mignolo DX',
+            ' ': 'Pollici'
+        };
+
+        const ENCOURAGEMENTS = [
+            { text: "Ottimo lavoro! 🌟", icon: "⭐" },
+            { text: "Super Preciso! 🎯", icon: "🚀" },
+            { text: "Stella Spaziale! ✨", icon: "🌌" },
+            { text: "Bravissimo! 👏", icon: "🏆" }
+        ];
+
+        // --- STATO DELL'APPLICAZIONE ---
+        let selectedLevel = 1;
+        let selectedDuration = 120;
+        let selectedSpeed = 1.0;
+        let selectedCase = 'uppercase';
+
+        let canvas, ctx;
+        let animationId;
+        let isRunning = false;
+        let isPaused = false;
+        let gameTimer = null;
+        let timeRemaining = 120;
+
+        let score = 0;
+        let totalTypedKeys = 0;
+        let correctTypedKeys = 0;
+        let completedItemsList = [];
+
+        let asteroids = [];
+        let particles = [];
+        let lasers = [];
+        let stars = [];
+        let playerShip = { x: 0, y: 0 };
+
+        // --- NAVIGAZIONE TRA SCHERMATE ---
+        function goToHome() {
+            hideAllScreens();
+            document.getElementById('screen-home').classList.remove('hidden');
+        }
+
+        function goToSettings() {
+            hideAllScreens();
+            document.getElementById('screen-settings').classList.remove('hidden');
+        }
+
+        function hideAllScreens() {
+            document.getElementById('screen-home').classList.add('hidden');
+            document.getElementById('screen-settings').classList.add('hidden');
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-report').classList.add('hidden');
+            document.getElementById('main-header').classList.add('hidden');
+        }
+
+        function selectLevel(lvl) {
+            selectedLevel = lvl;
+            document.querySelectorAll('.level-card').forEach((card, idx) => {
+                if (idx + 1 === lvl) {
+                    card.className = "level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-indigo-700 border-amber-300 ring-4 ring-amber-300/40";
+                } else {
+                    card.className = "level-card p-4 rounded-2xl border-2 text-left transition flex flex-col justify-between bg-slate-600 border-slate-400 hover:border-white";
+                }
+            });
+        }
+
+        // --- AVVIO, PAUSA E CONTROLLO PARTITA ---
+        function startMission() {
+            sound.init();
+            isPaused = false;
+            document.getElementById('pause-modal').classList.add('hidden');
+
+            selectedDuration = parseInt(document.getElementById('setting-duration').value);
+            selectedSpeed = parseFloat(document.getElementById('setting-speed').value);
+            selectedCase = document.getElementById('setting-case').value;
+
+            const vKeyboard = document.getElementById('virtual-keyboard');
+            if (selectedCase === 'lowercase') {
+                vKeyboard.classList.add('text-lowercase-mode');
+            } else {
+                vKeyboard.classList.remove('text-lowercase-mode');
+            }
+
+            hideAllScreens();
+            document.getElementById('screen-game').classList.remove('hidden');
+            document.getElementById('main-header').classList.remove('hidden');
+
+            document.getElementById('hud-level-title').innerText = LEVEL_CONFIGS[selectedLevel].title;
+
+            score = 0;
+            totalTypedKeys = 0;
+            correctTypedKeys = 0;
+            completedItemsList = [];
+            asteroids = [];
+            particles = [];
+            lasers = [];
+
+            timeRemaining = selectedDuration;
+            updateHud();
+
+            canvas = document.getElementById('game-canvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+            initStars();
+
+            startTimer();
+
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = true;
+            spawnAsteroid();
+            animate();
+        }
+
+        function startTimer() {
+            if (gameTimer) clearInterval(gameTimer);
+            if (selectedDuration > 0) {
+                gameTimer = setInterval(() => {
+                    if (!isPaused) {
+                        timeRemaining--;
+                        updateHud();
+                        if (timeRemaining <= 0) {
+                            endGame();
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        function togglePause() {
+            if (!isRunning) return;
+            if (isPaused) {
+                resumeGame();
+            } else {
+                pauseGame();
+            }
+        }
+
+        function pauseGame() {
+            isPaused = true;
+            document.getElementById('pause-modal').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            isPaused = false;
+            document.getElementById('pause-modal').classList.add('hidden');
+        }
+
+        function restartGame() {
+            startMission();
+        }
+
+        function abortGame() {
+            if (gameTimer) clearInterval(gameTimer);
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = false;
+            isPaused = false;
+            document.getElementById('pause-modal').classList.add('hidden');
+            goToSettings();
+        }
+
+        function endGame() {
+            if (gameTimer) clearInterval(gameTimer);
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = false;
+            isPaused = false;
+            sound.playSuccess();
+            showReport();
+        }
+
+        // --- REPORT FINALE E DOWNLOAD ---
+        function showReport() {
+            hideAllScreens();
+            document.getElementById('screen-report').classList.remove('hidden');
+
+            const now = new Date();
+            document.getElementById('report-date').innerText = `Data: ${now.toLocaleDateString('it-IT')} ore ${now.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+
+            document.getElementById('rep-level').innerText = LEVEL_CONFIGS[selectedLevel].title;
+            
+            if (selectedDuration === 0) {
+                document.getElementById('rep-duration').innerText = "Senza Limite";
+            } else if (selectedDuration === 30) {
+                document.getElementById('rep-duration').innerText = "30 Secondi";
+            } else {
+                document.getElementById('rep-duration').innerText = `${selectedDuration / 60} Minuti`;
+            }
+            
+            const speedNames = { '0.7': 'Lenta', '1.0': 'Media', '1.5': 'Veloce', '2.0': 'Molto Veloce' };
+            document.getElementById('rep-speed').innerText = speedNames[selectedSpeed] || 'Media';
+            document.getElementById('rep-case').innerText = selectedCase === 'lowercase' ? 'abc (Minuscolo)' : 'ABC (Maiuscolo)';
+
+            const acc = totalTypedKeys === 0 ? 100 : Math.round((correctTypedKeys / totalTypedKeys) * 100);
+            const elapsedMinutes = selectedDuration > 0 ? (selectedDuration / 60) : 1;
+            const wpm = Math.round((correctTypedKeys / 5) / elapsedMinutes);
+
+            document.getElementById('rep-score').innerText = score;
+            document.getElementById('rep-accuracy').innerText = `${acc}%`;
+            document.getElementById('rep-completed').innerText = completedItemsList.length;
+            document.getElementById('rep-wpm').innerText = wpm;
+
+            let starsStr = "⭐";
+            if (acc >= 75 && completedItemsList.length >= 5) starsStr = "⭐⭐";
+            if (acc >= 90 && completedItemsList.length >= 10) starsStr = "⭐⭐⭐";
+            document.getElementById('report-stars').innerText = starsStr;
+
+            const container = document.getElementById('rep-words-container');
+            document.getElementById('rep-list-count').innerText = completedItemsList.length;
+            container.innerHTML = '';
+            if (completedItemsList.length === 0) {
+                container.innerHTML = '<span class="text-slate-500 font-sans">Nessun elemento completato.</span>';
+            } else {
+                completedItemsList.forEach(item => {
+                    const tag = document.createElement('span');
+                    tag.className = 'px-2 py-0.5 bg-slate-800 border border-slate-700 rounded font-bold';
+                    tag.innerText = item;
+                    container.appendChild(tag);
+                });
+            }
+        }
+
+        function downloadReport() {
+            window.print();
+        }
+
+        // --- MOTORE GRAFICO CANVAS ---
+        function resizeCanvas() {
+            if (!canvas) return;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            playerShip.x = canvas.width / 2;
+            playerShip.y = canvas.height - 40;
+        }
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 60; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 0.4 + 0.2
+                });
+            }
+        }
+
+        function spawnAsteroid() {
+            const config = LEVEL_CONFIGS[selectedLevel];
+            let rawText = config.items[Math.floor(Math.random() * config.items.length)];
+            const text = selectedCase === 'lowercase' ? rawText.toLowerCase() : rawText.toUpperCase();
+            const radius = Math.max(28, text.length * 12 + 12);
+            const x = Math.random() * (canvas.width - radius * 2) + radius;
+
+            asteroids.push({
+                x: x,
+                y: -radius,
+                radius: radius,
+                text: text,
+                currentIndex: 0,
+                speed: (Math.random() * 0.3 + 0.4) * selectedSpeed,
+                color: `hsl(${Math.floor(Math.random() * 360)}, 75%, 60%)`
+            });
+
+            updateTargetKeyHighlight();
+        }
+
+        function animate() {
+            if (!isRunning) return;
+
+            if (!isPaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // 1. Stelle di sfondo
+                ctx.fillStyle = '#ffffff';
+                stars.forEach(star => {
+                    star.y += star.speed;
+                    if (star.y > canvas.height) star.y = 0;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // 2. Generazione nuovi asteroidi
+                if (asteroids.length < 3 && Math.random() < 0.02) {
+                    spawnAsteroid();
+                }
+
+                // 3. Raggi Laser
+                for (let i = lasers.length - 1; i >= 0; i--) {
+                    const l = lasers[i];
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(playerShip.x, playerShip.y);
+                    ctx.lineTo(l.targetX, l.targetY);
+                    ctx.stroke();
+                    l.life -= 0.15;
+                    if (l.life <= 0) lasers.splice(i, 1);
+                }
+
+                // 4. Particelle esplosione
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= 0.025;
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, p.alpha);
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    if (p.alpha <= 0) particles.splice(i, 1);
+                }
+
+                // 5. Asteroidi
+                for (let i = asteroids.length - 1; i >= 0; i--) {
+                    const ast = asteroids[i];
+                    ast.y += ast.speed;
+
+                    ctx.save();
+                    ctx.translate(ast.x, ast.y);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = ast.color;
+                    ctx.stroke();
+
+                    // Testo dentro l'asteroide
+                    ctx.font = 'bold 20px Fredoka, sans-serif';
+                    ctx.textBaseline = 'middle';
+
+                    const typedPart = ast.text.substring(0, ast.currentIndex);
+                    const remainingPart = ast.text.substring(ast.currentIndex);
+                    const totalWidth = ctx.measureText(ast.text).width;
+                    let startX = -totalWidth / 2;
+
+                    if (typedPart) {
+                        ctx.fillStyle = '#4ade80';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(typedPart, startX, 0);
+                        startX += ctx.measureText(typedPart).width;
+                    }
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(remainingPart, startX, 0);
+                    ctx.restore();
+
+                    // Se tocca il fondo senza penalità punitive
+                    if (ast.y > canvas.height - 50) {
+                        asteroids.splice(i, 1);
+                        if (asteroids.length === 0) spawnAsteroid();
+                        updateTargetKeyHighlight();
+                    }
+                }
+
+                // 6. Navicella del Giocatore
+                ctx.save();
+                ctx.translate(playerShip.x, playerShip.y);
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.moveTo(0, -20);
+                ctx.lineTo(18, 15);
+                ctx.lineTo(-18, 15);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(0, -2, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // --- GESTIONE INPUT TASTIERA E TOUCH ---
+        function processKeyInput(rawKey) {
+            if (!isRunning || isPaused) return;
+            const key = rawKey.toUpperCase();
+
+            totalTypedKeys++;
+            flashVirtualKey(key);
+
+            // Trova l'asteroide più in basso che inizia con la lettera digitata
+            let matchedIndex = -1;
+            let lowestY = -9999;
+
+            for (let i = 0; i < asteroids.length; i++) {
+                const ast = asteroids[i];
+                const expectedChar = ast.text[ast.currentIndex].toUpperCase();
+                if (key === expectedChar && ast.y > lowestY) {
+                    lowestY = ast.y;
+                    matchedIndex = i;
+                }
+            }
+
+            if (matchedIndex !== -1) {
+                correctTypedKeys++;
+                score += 10;
+                sound.playLaser();
+
+                const ast = asteroids[matchedIndex];
+                ast.currentIndex++;
+
+                lasers.push({ targetX: ast.x, targetY: ast.y, life: 1.0 });
+
+                if (ast.currentIndex >= ast.text.length) {
+                    sound.playExplosion();
+                    completedItemsList.push(ast.text);
+                    createExplosion(ast.x, ast.y, ast.color, 20);
+                    asteroids.splice(matchedIndex, 1);
+
+                    if (completedItemsList.length % 4 === 0) {
+                        showEncouragement();
+                    }
+                }
+
+                if (asteroids.length === 0) spawnAsteroid();
+            } else {
+                sound.playSoftError();
+            }
+
+            updateHud();
+            updateTargetKeyHighlight();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (!isRunning || isPaused) return;
+            if (e.key.length > 1 && e.key !== ' ') return;
+            if (e.key === ' ') e.preventDefault();
+            processKeyInput(e.key);
+        });
+
+        // Supporto click/touch anche sui tasti della tastiera virtuale
+        document.querySelectorAll('.keyboard-key').forEach(keyEl => {
+            keyEl.addEventListener('click', () => {
+                const k = keyEl.getAttribute('data-key');
+                if (k) processKeyInput(k);
+            });
+        });
+
+        function updateTargetKeyHighlight() {
+            document.querySelectorAll('.keyboard-key').forEach(k => k.classList.remove('key-target'));
+            if (asteroids.length === 0) return;
+
+            let lowest = asteroids[0];
+            for (let i = 1; i < asteroids.length; i++) {
+                if (asteroids[i].y > lowest.y) lowest = asteroids[i];
+            }
+
+            const targetCharUpper = lowest.text[lowest.currentIndex].toUpperCase();
+            const displayChar = selectedCase === 'lowercase' ? targetCharUpper.toLowerCase() : targetCharUpper;
+            
+            const keyEl = document.querySelector(`.keyboard-key[data-key="${targetCharUpper}"]`);
+            if (keyEl) keyEl.classList.add('key-target');
+
+            const guideKeyName = document.getElementById('guide-key-name');
+            const guideFingerName = document.getElementById('guide-finger-name');
+            if (guideKeyName && guideFingerName) {
+                guideKeyName.innerText = targetCharUpper === ' ' ? 'SPAZIO' : displayChar;
+                guideFingerName.innerText = `(${FINGER_MAP[targetCharUpper] || 'Dito consigliato'})`;
+            }
+        }
+
+        function flashVirtualKey(key) {
+            const keyEl = document.querySelector(`.keyboard-key[data-key="${key}"]`);
+            if (keyEl) {
+                keyEl.classList.add('key-active');
+                setTimeout(() => keyEl.classList.remove('key-active'), 120);
+            }
+        }
+
+        function createExplosion(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 3 + 1;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 3.5 + 1.5,
+                    color: color,
+                    alpha: 1.0
+                });
+            }
+        }
+
+        function showEncouragement() {
+            const toast = document.getElementById('toast-message');
+            const item = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+            document.getElementById('toast-text').innerText = item.text;
+            document.getElementById('toast-icon').innerText = item.icon;
+
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 1600);
+        }
+
+        function updateHud() {
+            if (selectedDuration === 0) {
+                document.getElementById('hud-timer').innerText = "∞ Relax";
+            } else {
+                const mins = Math.floor(timeRemaining / 60);
+                const secs = timeRemaining % 60;
+                document.getElementById('hud-timer').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            document.getElementById('hud-score').innerText = score;
+            const acc = totalTypedKeys === 0 ? 100 : Math.round((correctTypedKeys / totalTypedKeys) * 100);
+            document.getElementById('hud-accuracy').innerText = `${acc}%`;
+        }
+
+        function toggleAudio() {
+            sound.muted = !sound.muted;
+            document.getElementById('btn-sound').innerText = sound.muted ? '🔇' : '🔊';
+        }
+
+        function toggleHighContrast() {
+            document.body.classList.toggle('high-contrast');
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
